@@ -176,6 +176,9 @@ export function ExpenseCapture({
   const [scanning, setScanning] = useState(false);
   const [aiAmount, setAiAmount] = useState<number | null>(null);
   const [perfectParse, setPerfectParse] = useState<PerfectParseResult>(null);
+  const [editableLines, setEditableLines] = useState<
+    Array<{ description: string; amount: number }>
+  >([]);
   const [confirmedAmount, setConfirmedAmount] = useState<string>("");
   const [vendor, setVendor] = useState<string>("");
   const [note, setNote] = useState<string>("");
@@ -210,6 +213,7 @@ export function ExpenseCapture({
     setReceiptFilename(null);
     setAiAmount(null);
     setPerfectParse(null);
+    setEditableLines([]);
     setConfirmedAmount("");
     setVendor(AI_VENDORS[cat] || "");
     setNote("");
@@ -226,7 +230,9 @@ export function ExpenseCapture({
 
       if (selectedCategory === "marketing") {
         // Perfect Parse — return hardcoded Instagram Ads itemized JSON
+        const lines = MARKETING_PERFECT_PARSE.lines.map((l) => ({ ...l }));
         setPerfectParse(MARKETING_PERFECT_PARSE);
+        setEditableLines(lines);
         setAiAmount(MARKETING_PERFECT_PARSE.total);
         setConfirmedAmount(String(MARKETING_PERFECT_PARSE.total));
         setVendor(MARKETING_PERFECT_PARSE.vendor);
@@ -258,10 +264,10 @@ export function ExpenseCapture({
       receiptFilename,
       status: "verified",
       aiExtractedAmount: aiAmount,
-      // Preserve the parsed line items so the ledger can show the breakdown
+      // Preserve the (possibly edited) parsed line items for the ledger
       ...(perfectParse
         ? {
-            aiParsedLines: [...perfectParse.lines],
+            aiParsedLines: editableLines.length ? editableLines : [...perfectParse.lines],
             aiVendor: perfectParse.vendor,
           }
         : {}),
@@ -298,6 +304,7 @@ export function ExpenseCapture({
       setReceiptFilename(null);
       setAiAmount(null);
       setPerfectParse(null);
+      setEditableLines([]);
       setConfirmedAmount("");
       setVendor("");
       setNote("");
@@ -518,25 +525,53 @@ export function ExpenseCapture({
                   <span className="font-semibold text-ink-800">{perfectParse.vendor}</span>
                 </div>
 
-                {/* Itemized line items */}
+                {/* Editable line items */}
                 <div className="rounded-lg overflow-hidden ring-1 ring-brand-100/80">
-                  {perfectParse.lines.map((line, i) => (
+                  {editableLines.map((line, i) => (
                     <div
                       key={i}
-                      className="flex items-center justify-between px-3.5 py-2.5 bg-white/60 border-b border-brand-100/60 last:border-0"
+                      className="flex items-center gap-2 px-3.5 py-2.5 bg-white/60 border-b border-brand-100/60 last:border-0"
                     >
-                      <span className="text-[13px] text-ink-700">{line.description}</span>
-                      <span className="text-[13px] font-mono tabular font-medium text-ink-900">
-                        {formatMoney(line.amount)}
-                      </span>
+                      <input
+                        type="text"
+                        value={line.description}
+                        onChange={(e) => {
+                          const next = editableLines.map((l, j) =>
+                            j === i ? { ...l, description: e.target.value } : l,
+                          );
+                          setEditableLines(next);
+                        }}
+                        className="flex-1 text-[13px] text-ink-700 bg-transparent outline-none border-b border-transparent focus:border-brand-300"
+                      />
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <span className="text-[11px] text-ink-400">$</span>
+                        <input
+                          type="number"
+                          value={line.amount}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            const next = editableLines.map((l, j) =>
+                              j === i ? { ...l, amount: val } : l,
+                            );
+                            setEditableLines(next);
+                            // Auto-update the total
+                            const newTotal = next.reduce((s, l) => s + l.amount, 0);
+                            setConfirmedAmount(String(newTotal));
+                          }}
+                          className="w-20 text-right text-[13px] font-mono tabular font-medium text-ink-900 bg-transparent outline-none border-b border-transparent focus:border-brand-300"
+                        />
+                      </div>
                     </div>
                   ))}
+                  {/* Running total — reflects edits */}
                   <div className="flex items-center justify-between px-3.5 py-3 bg-brand-50/60">
                     <span className="text-[11px] font-bold text-brand-800 uppercase tracking-wide">
                       Total
                     </span>
                     <span className="text-[18px] font-mono tabular font-bold text-brand-900">
-                      {formatMoney(perfectParse.total)}
+                      {formatMoney(
+                        editableLines.reduce((s, l) => s + l.amount, 0),
+                      )}
                     </span>
                   </div>
                 </div>
@@ -568,26 +603,31 @@ export function ExpenseCapture({
               )
             )}
 
-            {/* Edit fields — amount hidden for Perfect Parse (total is fixed) */}
+            {/* Edit fields — always editable, even for Perfect Parse */}
             <div className="space-y-3">
-              {!perfectParse && (
-                <div>
-                  <label className="eyebrow text-[9.5px] text-ink-500 block mb-1">
-                    Amount
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="eyebrow text-[9.5px] text-ink-500">
+                    Total amount
                   </label>
-                  <div className="flex items-center rounded-xl ring-1 ring-ink-200/80 bg-white px-3.5 py-3 gap-2">
-                    <span className="text-ink-400 text-[14px]">$</span>
-                    <input
-                      type="number"
-                      value={confirmedAmount}
-                      onChange={(e) => setConfirmedAmount(e.target.value)}
-                      className="flex-1 text-[18px] font-mono tabular text-ink-900 bg-transparent outline-none"
-                      placeholder="0.00"
-                      autoFocus
-                    />
-                  </div>
+                  {perfectParse && (
+                    <span className="text-[9.5px] text-ink-400">
+                      AI-extracted · edit if needed
+                    </span>
+                  )}
                 </div>
-              )}
+                <div className="flex items-center rounded-xl ring-1 ring-ink-200/80 bg-white px-3.5 py-3 gap-2">
+                  <span className="text-ink-400 text-[14px]">$</span>
+                  <input
+                    type="number"
+                    value={confirmedAmount}
+                    onChange={(e) => setConfirmedAmount(e.target.value)}
+                    className="flex-1 text-[18px] font-mono tabular text-ink-900 bg-transparent outline-none"
+                    placeholder="0.00"
+                    autoFocus={!perfectParse}
+                  />
+                </div>
+              </div>
 
               {!perfectParse && (
                 <div>
@@ -623,11 +663,11 @@ export function ExpenseCapture({
                 variant="brand"
                 className="flex-1 h-12 text-[14px]"
                 onClick={handleSave}
-                disabled={!perfectParse && (!confirmedAmount || isNaN(parseFloat(confirmedAmount)))}
+                disabled={!confirmedAmount || isNaN(parseFloat(confirmedAmount))}
               >
                 <Check className="h-4 w-4" />
-                {perfectParse
-                  ? `Save ${formatMoney(perfectParse.total)} — verified`
+                {confirmedAmount && !isNaN(parseFloat(confirmedAmount))
+                  ? `Save ${formatMoney(parseFloat(confirmedAmount))} — verified`
                   : "Save receipt"}
               </Button>
               <Button

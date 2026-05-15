@@ -626,7 +626,7 @@ function LineItemRow({
         </div>
       </div>
 
-      {/* Perfect Parse: show vendor + itemized breakdown instead of plain inputs */}
+      {/* Perfect Parse: show vendor + itemized breakdown with editable total */}
       {isPerfectParse && item.aiParsedLines ? (
         <div className="mb-2">
           {item.aiVendor && (
@@ -639,21 +639,71 @@ function LineItemRow({
             {item.aiParsedLines.map((line, i) => (
               <div
                 key={i}
-                className="flex items-center justify-between px-3 py-2 border-b border-brand-100/60 last:border-0"
+                className="flex items-center gap-2 px-3 py-2 border-b border-brand-100/60 last:border-0"
               >
-                <span className="text-[12px] text-ink-700">{line.description}</span>
-                <span className="text-[12px] font-mono tabular text-ink-900 font-medium">
-                  {formatMoney(line.amount)}
-                </span>
+                <input
+                  type="text"
+                  value={line.description}
+                  disabled={isDbItem}
+                  onChange={(e) => {
+                    const next = item.aiParsedLines!.map((l, j) =>
+                      j === i ? { ...l, description: e.target.value } : l,
+                    );
+                    onUpdate({ aiParsedLines: next, status: "extracted" });
+                  }}
+                  className="flex-1 text-[12px] text-ink-700 bg-transparent outline-none border-b border-transparent focus:border-brand-300 disabled:opacity-60"
+                />
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <span className="text-[11px] text-ink-400">$</span>
+                  <input
+                    type="number"
+                    value={line.amount}
+                    disabled={isDbItem}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      const next = item.aiParsedLines!.map((l, j) =>
+                        j === i ? { ...l, amount: val } : l,
+                      );
+                      const newTotal = next.reduce((s, l) => s + l.amount, 0);
+                      onUpdate({
+                        aiParsedLines: next,
+                        amount: newTotal,
+                        status: "extracted",
+                      });
+                    }}
+                    className="w-20 text-right text-[12px] font-mono tabular text-ink-900 font-medium bg-transparent outline-none border-b border-transparent focus:border-brand-300 disabled:opacity-60"
+                  />
+                </div>
               </div>
             ))}
-            <div className="flex items-center justify-between px-3 py-2 bg-brand-50/60">
-              <span className="text-[11px] font-semibold text-brand-800 uppercase tracking-wide">
-                Total
-              </span>
-              <span className="text-[14px] font-mono tabular font-bold text-brand-900">
-                {formatMoney(item.amount)}
-              </span>
+            {/* Editable total — edit to re-trigger confirm step */}
+            <div className="flex items-center justify-between px-3 py-2 bg-brand-50/60 gap-3">
+              <div>
+                <span className="text-[11px] font-semibold text-brand-800 uppercase tracking-wide">
+                  Total
+                </span>
+                <span className="text-[9.5px] text-ink-400 ml-1.5">
+                  edit if needed
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[12px] text-brand-700">$</span>
+                <input
+                  type="number"
+                  value={item.amount ?? ""}
+                  onChange={(e) => {
+                    const val = e.target.value ? parseFloat(e.target.value) : null;
+                    onUpdate({
+                      amount: val,
+                      // Drop back to extracted so the Confirm button reappears
+                      status: "extracted",
+                    });
+                  }}
+                  disabled={isDbItem}
+                  className="w-20 text-right text-[14px] font-mono tabular font-bold text-brand-900 bg-transparent outline-none border-b border-brand-300/60 focus:border-brand-600 disabled:opacity-60"
+                  placeholder="0.00"
+                />
+              </div>
             </div>
           </div>
         </div>
