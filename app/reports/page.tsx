@@ -47,6 +47,10 @@ export default async function ReportsPage() {
 
   const unsupportedPct = (100 - r.inAppToolUsageRate * 100).toFixed(0);
   const disputedPct = (r.disputedRate * 100).toFixed(1);
+  const ghostDisputePct =
+    r.totalSettlements > 0
+      ? ((r.ghostDisputeCount / r.totalSettlements) * 100).toFixed(0)
+      : "0";
 
   return (
     <div className="px-12 py-10 max-w-7xl">
@@ -147,6 +151,56 @@ export default async function ReportsPage() {
           </div>
         </div>
       </div>
+
+      {/* Ghost Disputes — new Provenance Engine metric */}
+      {r.ghostDisputeCount > 0 && (
+        <div className="mb-16">
+          <h2
+            className="font-display text-[24px] font-medium text-ink-900 mb-2"
+            style={{ letterSpacing: "-0.02em" }}
+          >
+            Ghost Disputes
+          </h2>
+          <p className="text-[13px] text-ink-500 mb-5 max-w-2xl leading-relaxed">
+            Settlements marked &ldquo;Disputed&rdquo; where the sign-off field
+            contains clear language of agreement (&ldquo;Looks good&rdquo;,
+            &ldquo;OK wire Monday&rdquo;, etc.). The system hasn&apos;t
+            been updated to reflect the human agreement that already happened.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <SmallMetric
+              label="Ghost disputes detected"
+              value={String(r.ghostDisputeCount)}
+              subtext={`${ghostDisputePct}% of all settlements`}
+              alarming={r.ghostDisputeCount > 0}
+            />
+            <SmallMetric
+              label="Settlement value at risk"
+              value={formatMoney(r.ghostDisputeValue)}
+              mono
+              alarming={r.ghostDisputeValue > 0}
+            />
+            <SmallMetric
+              label="Pattern"
+              value="Agreement in signoff"
+              subtext={'e.g. "Looks good", "OK wire Monday", "👍"'}
+            />
+          </div>
+          <div className="mt-4 rounded-lg border border-amber-200/60 bg-amber-50/30 px-4 py-3 text-[12.5px] text-ink-700 leading-relaxed">
+            <span className="font-semibold text-amber-800">What this means:</span>{" "}
+            These settlements should likely be in{" "}
+            <code className="font-mono text-[11px] bg-white/80 px-1 py-0.5 rounded ring-1 ring-ink-200/40">
+              finalized
+            </code>{" "}
+            or{" "}
+            <code className="font-mono text-[11px] bg-white/80 px-1 py-0.5 rounded ring-1 ring-ink-200/40">
+              paid
+            </code>{" "}
+            state. The Provenance Engine can detect and flag these automatically
+            from the sign-off field — no schema change needed.
+          </div>
+        </div>
+      )}
 
       {/* Settlement funnel */}
       <div className="mb-16">

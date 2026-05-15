@@ -6,8 +6,11 @@ import {
   AlertCircle,
   Clock,
   TrendingUp,
+  Receipt,
 } from "lucide-react";
 import { getShowById } from "@/lib/queries";
+import { CaptureProgress } from "@/components/provenance/capture-progress";
+import { EnhancedExpensesTable } from "@/components/provenance/enhanced-expenses-table";
 import {
   Card,
   CardContent,
@@ -119,12 +122,20 @@ export default async function ShowDetailPage({
               </span>
             </div>
           </div>
-          <Link href={`/shows/${show.id}/settle`} className="mt-6 shrink-0">
-            <Button variant="brand" size="lg">
-              <FileSpreadsheet className="h-4 w-4" />
-              {settlement ? "View settlement" : "Settle show"}
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2 mt-6 shrink-0">
+            <Link href={`/shows/${show.id}/capture`}>
+              <Button variant="secondary" size="lg">
+                <Receipt className="h-4 w-4" />
+                Expense Capture
+              </Button>
+            </Link>
+            <Link href={`/shows/${show.id}/settle`}>
+              <Button variant="brand" size="lg">
+                <FileSpreadsheet className="h-4 w-4" />
+                {settlement ? "View settlement" : "Settle show"}
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Key numbers strip */}
@@ -136,6 +147,9 @@ export default async function ShowDetailPage({
             <MiniStat label="To artist" value={formatMoneyCompact(settlement.totalToArtist)} accent />
           )}
         </div>
+
+        {/* Component 3: Settlement Readiness progress bar */}
+        <CaptureProgress showId={show.id} />
       </div>
 
       <div className="px-12 pb-12">
@@ -401,13 +415,13 @@ export default async function ShowDetailPage({
             </CardContent>
           </Card>
 
-          {/* Expenses */}
+          {/* Expenses — Enhanced with Deep Slice provenance view */}
           <Card className="md:col-span-3">
             <CardHeader>
               <div>
                 <CardTitle>Expenses</CardTitle>
                 <CardDescription>
-                  Entered during the week, often incompletely.
+                  Click a row to see itemized breakdown, cap logic, and receipt evidence.
                 </CardDescription>
               </div>
               {absorbedTotal > 0 && (
@@ -417,39 +431,11 @@ export default async function ShowDetailPage({
               )}
             </CardHeader>
             <CardContent>
-              {expenses.length === 0 ? (
-                <div className="text-[13px] text-ink-400">
-                  No expenses entered yet.
-                </div>
-              ) : (
-                <table className="w-full text-[13px]">
-                  <thead>
-                    <tr className="text-left border-b border-ink-100/80">
-                      <th className="py-2 eyebrow text-[10px] text-ink-400 font-semibold">Category</th>
-                      <th className="py-2 eyebrow text-[10px] text-ink-400 font-semibold">Description</th>
-                      <th className="py-2 eyebrow text-[10px] text-ink-400 font-semibold text-right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-ink-100/60">
-                    {expenses.map((e) => (
-                      <tr key={e.id}>
-                        <td className="py-2.5 capitalize">
-                          {e.category}
-                          {e.absorbedByVenue && (
-                            <PlainBadge variant="amber" className="ml-2">absorbed</PlainBadge>
-                          )}
-                        </td>
-                        <td className="py-2.5 text-ink-500">{e.description ?? "—"}</td>
-                        <td className="py-2.5 text-right font-mono tabular">{formatMoney(e.amount)}</td>
-                      </tr>
-                    ))}
-                    <tr className="font-medium">
-                      <td className="py-3" colSpan={2}>Total (passed through)</td>
-                      <td className="py-3 text-right font-mono tabular">{formatMoney(totalExpenses)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              )}
+              <EnhancedExpensesTable
+                showId={show.id}
+                expenses={expenses}
+                deal={deal}
+              />
             </CardContent>
           </Card>
         </div>

@@ -29,6 +29,9 @@ import {
 } from "@/lib/format";
 import type { Settlement, Recoup } from "@/db/schema";
 import { Logomark } from "@/components/brand/logo";
+import { GhostDisputeBanner } from "@/components/provenance/ghost-dispute-banner";
+import { DealIntelligence } from "@/components/provenance/deal-intelligence";
+import { VerifiedExpenseLedger } from "@/components/provenance/verified-ledger";
 
 const RECOUP_LABELS: Record<Recoup["category"], string> = {
   marketing: "Marketing",
@@ -99,6 +102,12 @@ export default async function SettlePage({
             <PlainBadge variant="default">Voided</PlainBadge>
           )}
         </div>
+
+        {/* Component 4: Ghost Dispute Flag — shown when status=disputed but
+            signoff text indicates the artist team has already agreed */}
+        {settlement && (
+          <GhostDisputeBanner settlement={settlement} showId={show.id} />
+        )}
         <h1 className="font-display text-[48px] font-medium text-ink-900 leading-[1.05]" style={{ letterSpacing: "-0.02em", fontOpticalSizing: "auto" }}>
           Settlement · {artist?.name}
         </h1>
@@ -127,6 +136,9 @@ export default async function SettlePage({
       )}
 
       <div className="space-y-6 mt-6">
+        {/* Component 2: Deal Rule Extractor — above the expense ledger */}
+        <DealIntelligence showId={show.id} deal={deal} />
+
         {!calc.supported ? (
           <UnsupportedDeal
             dealType={calc.dealType}
@@ -141,6 +153,13 @@ export default async function SettlePage({
         ) : (
           <SupportedSettlement calc={calc} existingSettlement={settlement} />
         )}
+
+        {/* Component 1: Verified Expense Ledger — replaces flat expense display */}
+        <VerifiedExpenseLedger
+          showId={show.id}
+          deal={deal}
+          initialExpenses={expenses}
+        />
 
         {recoups.length > 0 && <RecoupsSection recoups={recoups} />}
 

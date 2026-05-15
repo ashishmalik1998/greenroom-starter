@@ -18,6 +18,34 @@ import {
 } from "@/db/schema";
 import { desc, asc, eq, sql, lte } from "drizzle-orm";
 
+/**
+ * Returns true when a settlement shows status='disputed' but the signoff text
+ * contains language that indicates the artist team has actually agreed.
+ * These are "ghost disputes" — stuck in the wrong system state.
+ */
+export function isGhostDisputeSignoff(
+  signoffText: string | null | undefined,
+): boolean {
+  if (!signoffText) return false;
+  const lower = signoffText.toLowerCase().trim();
+  // "ok" at the start is an unambiguous positive ("ok wire monday", "OK — but...")
+  if (lower.startsWith("ok")) return true;
+  // Emoji thumbs-up
+  if (lower === "👍" || lower.startsWith("👍")) return true;
+  const phrases = [
+    "looks good",
+    "approved",
+    "confirmed",
+    "lgtm",
+    "all good",
+    "agreed",
+    "sign off",
+    "signed off",
+    "wire",
+  ];
+  return phrases.some((p) => lower.includes(p));
+}
+
 function todayDateString(): string {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -208,6 +236,19 @@ export async function getReports() {
     compsByCategory[c.category] = (compsByCategory[c.category] ?? 0) + c.count;
   }
 
+  // Ghost disputes: status='disputed' but signoff text indicates human agreement.
+  // These settlements are stuck in a false-disputed state — the artist team has
+  // already agreed, but the system hasn't been updated to reflect it.
+  const ghostDisputeSettlements = pastSettlements.filter(
+    (s) => s.status === "disputed" && isGhostDisputeSignoff(s.signoffText),
+  );
+  const ghostDisputeCount = ghostDisputeSettlements.length;
+  // Value at risk: sum of totalToArtist for these stuck settlements
+  const ghostDisputeValue = ghostDisputeSettlements.reduce(
+    (sum, s) => sum + (s.totalToArtist ?? 0),
+    0,
+  );
+
   return {
     dealTypeCounts,
     totalDeals,
@@ -226,6 +267,8 @@ export async function getReports() {
     totalCompTickets,
     totalCompFaceValue,
     compsByCategory,
+    ghostDisputeCount,
+    ghostDisputeValue,
   };
 }
 
